@@ -82,13 +82,16 @@ void *write_loop(void *arg) {
     ssize_t count = write(ctx->fd, buf, n_bytes);
     if (count == -1) {
       perror("write: ");
+      ctx->bytes_written = -1;
       goto quit;
     }
+
+    ctx->bytes_written += count;
   }
 
 quit:
   free(buf);
-  return NULL;
+  return &(ctx->bytes_written);
 }
 
 int run_loop(params_t params) {
@@ -108,6 +111,7 @@ int run_loop(params_t params) {
     ctx->n_runs = params.n_runs;
     ctx->fd = params.fd;
     ctx->barrier = &barrier;
+    ctx->bytes_written = 0;
 
     if (pthread_create(thread, NULL, write_loop, ctx) != 0) {
       return EXIT_FAILURE;
@@ -118,12 +122,22 @@ int run_loop(params_t params) {
 
   barrier = false;
 
+  int ret_val = EXIT_SUCCESS;
+
   for (uint8_t t = 0; t < n_threads; ++t) {
     pthread_t thread = threads[t];
+    ssize_t **bytes_writen;
     pthread_join(thread, NULL);
+
+    const ssize_t bytes_written = ctxs[t].bytes_written;
+    const size_t n_bytes = ctxs[t].n_bytes;
+    const size_t n_runs = ctxs[t].n_runs;
+    if (((n_bytes + 1) * n_runs) != bytes_written) {
+      ret_val = EXIT_FAILURE;
+    }
   }
 
-  return EXIT_SUCCESS;
+  return ret_val;
 }
 
 int main(int argc, char **argv) {
