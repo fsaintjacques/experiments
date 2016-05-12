@@ -47,12 +47,19 @@ bool parse_arguments(int argc, char **argv, params_t *params) {
 }
 
 typedef struct thread_ctx {
+  /** character this thread will write continuously. */
   char byte;
+  /** number of times the character is repeated per run. */
   size_t n_bytes;
+  /** number of runs */
   uint16_t n_runs;
-
+  /** wait barrier to synchronize threads startup */
   atomic_bool *barrier;
+  /** file descriptor to write to */
   int fd;
+
+  /** number of bytes written */
+  ssize_t bytes_written;
 } thread_ctx_t;
 
 void *write_loop(void *arg) {
@@ -67,7 +74,6 @@ void *write_loop(void *arg) {
   memset(buf, ctx->byte, n_bytes);
   buf[n_bytes - 1] = '\n';
 
-  /* synchronize threads start at _somewhat_ the same time. */
   while (*(ctx->barrier)) {
     asm volatile("" : : : "memory");
   }

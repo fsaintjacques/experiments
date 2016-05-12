@@ -8,10 +8,36 @@ set -o errexit -o nounset
 : ${N_BYTES:=$((8 * 1024 + 1))}
 : ${N_RUNS:=9001}
 
+
+# Run $N_PROCS concurrent processes each running $N_THREADS concurrent threads,
+# appending $N_BYTES bytes repeated $N_RUNS to $TEST_FILE. Threads are
+# synchronized within a process, processes are not synchronized.
+run() {
+  if [[ -e "$TEST_FILE" ]]; then
+    rm -f $TEST_FILE
+  fi
+
+  for i in $(seq 1 $N_PROCS); do
+    ./will-it-blend ${N_THREADS} ${N_RUNS} ${N_BYTES} $TEST_FILE &
+  done
+
+  for pid in $(jobs -p | cut -d' ' -f4-5|grep -o '[0-9]*'); do
+    wait $pid
+  done
+}
+
+# Validate that $TEST_FILE didn't suffer from overwrites in concurrent writes.
+# We validate:
+# - the number of lines (should be $N_PROCS * $N_THREADS * $N_RUNS).
+# - the number of bytes (should be n_lines * bytes_per_line).
+# - distinct number of lines is _exactly_ $N_THREADS
 validate_result() {
   local expected_lines=$(($N_PROCS * $N_THREADS * $N_RUNS))
   local bytes_per_line=$(($N_BYTES + 1))
   local expected_size=$(($expected_lines * $bytes_per_line))
+
+  # coreutils such slow.
+  export LANG=C
 
   local n_bytes=$(wc -c $TEST_FILE | cut -d' ' -f1)
   local n_lines=$(wc -l $TEST_FILE | cut -d' ' -f1)
@@ -26,7 +52,6 @@ validate_result() {
     exit 1
   fi
 
-  export LANG=C
   local n_distinct_lines=$(sort -u -S10% "$TEST_FILE" | wc -l)
 
   if [[ $n_distinct_lines != $N_THREADS ]]; then
@@ -35,19 +60,6 @@ validate_result() {
   fi
 }
 
-run() {
-  if [[ -e "$TEST_FILE" ]]; then
-    rm -f $TEST_FILE
-  fi
-
-  for i in $(seq 1 $N_PROCS); do
-    sudo ionice -c 1 ./will-it-blend ${N_THREADS} ${N_RUNS} ${N_BYTES} $TEST_FILE &
-  done
-
-  for pid in $(jobs -p | cut -d' ' -f4-5|grep -o '[0-9]*'); do
-    wait $pid
-  done
-}
-
 run
+
 validate_result
