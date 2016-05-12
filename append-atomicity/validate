@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+set -o errexit -o nounset
+
+: ${TEST_FILE:=test}
+: ${N_THREADS:=17}
+: ${N_PROCS:=9}
+: ${N_BYTES:=$((8 * 1024 + 1))}
+: ${N_RUNS:=9001}
+
+validate_result() {
+  local expected_lines=$(($N_PROCS * $N_THREADS * $N_RUNS))
+  local bytes_per_line=$(($N_BYTES + 1))
+  local expected_size=$(($expected_lines * $bytes_per_line))
+
+  local n_bytes=$(wc -c $TEST_FILE | cut -d' ' -f1)
+  local n_lines=$(wc -l $TEST_FILE | cut -d' ' -f1)
+
+  if [[ $n_lines != $expected_lines ]]; then
+    echo "we're expecting $expected_lines lines but got $n_lines"
+    exit 1
+  fi
+
+  if [[ $n_bytes != $expected_size ]]; then
+    echo "we're expecting $expected_size bytes but got $n_bytes"
+    exit 1
+  fi
+
+  export LANG=C
+  local n_distinct_lines=$(sort -u -S10% "$TEST_FILE" | wc -l)
+
+  if [[ $n_distinct_lines != $N_THREADS ]]; then
+    echo "we're expecting $N_THREADS distinct lines but got $n_distinct_lines"
+    exit 1
+  fi
+}
+
+run() {
+  if [[ -e "$TEST_FILE" ]]; then
+    rm -f $TEST_FILE
+  fi
+
+  for i in $(seq 1 $N_PROCS); do
+    sudo ionice -c 1 ./will-it-blend ${N_THREADS} ${N_RUNS} ${N_BYTES} $TEST_FILE &
+  done
+
+  for pid in $(jobs -p | cut -d' ' -f4-5|grep -o '[0-9]*'); do
+    wait $pid
+  done
+}
+
+run
+validate_result
