@@ -6,5 +6,6 @@ will-it-blend: will-it-blend.c
 
 clean:
 	rm -f will-it-blend
+	rm -f test
 
 .PHONY = all clean
