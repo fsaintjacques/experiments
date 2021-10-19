@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Basic Performance Optimization</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      code {
+        background: #e7e8e2;
+        border-radius: 5px;
+      }
+      /* Two-column layout */
+      .left-column {
+        color: #777;
+        width: 20%;
+        height: 92%;
+        float: left;
+      }
+      .left-column h2:last-of-type, .left-column h3:last-child {
+        color: #000;
+        }
+      .right-column {
+        width: 75%;
+        float: right;
+        padding-top: 1em;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+# Basic Performance Optimization
+
+---
+
+## Cardinal sin
+
+Don't guess. Measure.
+
+---
+
+## Byte units are confusing
+
+
+.left-column[
+  1KB = ? bytes
+]
+.right-column[
+
+There's a difference between the bytes `metric` units and `IEC` units.
+
+* kpbs (network) = 1000 *bits* per second
+
+* KB/s (disk) = 1000 *bytes* per second
+
+* KiB/s (ram/cpu) = 1024 *bytes* per second
+
+
+KiB = Kibibyte
+
+MiB = Mebibyte
+
+GiB = Gibibyte
+
+]
+
+---
+
+## Hardware System limits
+
+* cpu:
+
+    3.5Ghz = 3.5B instructions seconds per core. AVX-512 vectorized-ADD can
+    perform 2 reads + 1 write at a bandwidth of `3*64*3.5B = 625 GiB/s`.
+
+* memory
+
+    * Single-channel: ~ 20 GiB/s
+    * Dual-channel: ~ 40 GiB/s
+    * Quad-channel: ~ 80 GiB/s
+    * Octo-channel: ~ 160 GiB/s
+
+* disk
+
+  * nvme: Sequential read 6900 MB/s ~ 6.42 GiB/s
+  * nvme: Sequential write 5000 MB/s ~ 4.65 GiB/s
+
+* network
+
+    * 1 gbps ~ 119MiB/sec
+    * 10 gpbs ~ 1.16GiB/sec
+    * 25 gpbs ~ 2.91GiB/sec
+
+---
+
+## Asynchronous Buffers all the way down
+
+* cpu: Transact in unit of cacheline (64 bytes). L1, L2, L3.
+
+* memory: Transact in unit of cacheline at the hardware level. Transact in unit
+          of pages = 4KiB at the OS level.
+
+* disk: HDD transact in unit of sectors, 512 bytes. SSD transact in unit of disk
+        pages often 4KiB, 8KiB, or 16KiB.
+
+* network: Ethernet transact either in units of frames up to 1500 bytes or jumbo
+           frames up to 9000 bytes.
+
+---
+
+## Basic exploration tool
+
+ * Unix pipe `|`
+
+ * `yes`: repeats a single string indefinitely to stdout
+
+ * `pv`: measure the bandwidth of a file (stdin) and tees it to stdout
+
+ * `nc`: cat for network
+
+---
+
+    </textarea>
+    <script src="remark-latest.min.js">
+    </script>
+    <script>
+      var slideshow = remark.create({
+        highlightStyle: 'monokai-sublime'
+      });
+    </script>
+  </body>
+</html>
